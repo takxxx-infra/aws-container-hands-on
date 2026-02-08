@@ -31,3 +31,21 @@ EOF
 
 # ファイルの所有者を設定
 chown ec2-user:ec2-user /home/ec2-user/load-test.js
+
+# Frontend APP & Backend APPの環境構築
+sudo -u ec2-user -- bash <<'EOS'
+set -euo pipefail
+
+cd ~
+git clone https://github.com/uma-arai/sbcntr-frontend.git; cd sbcntr-frontend
+git fetch; git switch v2
+
+sudo npm install -g pnpm
+cp .npmrc.sample .npmrc
+
+pnpm install --frozen-lockfile --prod
+
+cd ..
+git clone https://github.com/uma-arai/sbcntr-backend.git; cd sbcntr-backend
+git fetch; git switch v2
+EOS
