@@ -42,3 +42,7 @@ terraform.rc
 
 # source
 sbcntr_resources/
+
+# DS_Store
+.DS_Store
+**/.DS_Store

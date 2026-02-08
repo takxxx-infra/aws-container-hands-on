@@ -24,10 +24,10 @@ resource "aws_instance" "this" {
     Name = "${local.project_name}-${each.key}"
   }
 
-  ami             = each.value.ami
-  instance_type   = each.value.instance_type
-  subnet_id       = each.value.subnet_id
-  security_groups = each.value.security_groups
+  ami                    = each.value.ami
+  instance_type          = each.value.instance_type
+  subnet_id              = each.value.subnet_id
+  vpc_security_group_ids = each.value.security_groups
   root_block_device {
     volume_size           = each.value.root_volume_size
     volume_type           = each.value.root_volume_type
