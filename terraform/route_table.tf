@@ -1,14 +1,4 @@
 # ##################################################
-# Locals
-# ##################################################
-locals {
-  management_subnets = [
-    aws_subnet.this["public-management-a"],
-    aws_subnet.this["public-management-c"]
-  ]
-}
-
-# ##################################################
 # Ingress
 # ##################################################
 resource "aws_route_table" "ingress" {
