@@ -1,6 +1,6 @@
 # cost_cut scripts
 
-`scripts/cost_cut/main.sh` は、EC2 の起動/停止と、コストが発生するリソースの削除を行う運用スクリプトです。
+`scripts/cost_cut/main.sh` は、ECS/EC2 の設定切替と、コストが発生するリソースの apply/destroy を行う運用スクリプトです。
 
 ## 前提
 
@@ -15,15 +15,26 @@ chmod +x scripts/cost_cut/main.sh
 ./scripts/cost_cut/main.sh down
 ```
 
-`up` を指定すると EC2 起動のみ行います。
+`up` を指定すると起動・適用側の処理を行います。
 
 ```bash
 ./scripts/cost_cut/main.sh up
 ```
 
-## Terraform destroy 対象（例）
+## 動作
 
-`main.sh` の `targets` 配列に定義した以下リソースを削除します。
+- `up`
+  - ECS cluster `sbcntr-app` の `containerInsights` を `enhanced` に変更
+  - AWS CLI で `Name=sbcntr-pseudo-cloud9` かつ `stopped` の EC2 を探索し、存在すれば起動
+  - `targets` 配列に定義したリソースを `terraform apply`
+- `down`
+  - ECS cluster `sbcntr-app` の `containerInsights` を `enabled` に変更
+  - AWS CLI で `Name=sbcntr-pseudo-cloud9` かつ `running` の EC2 を探索し、存在すれば停止
+  - `targets` 配列に定義したリソースを `terraform destroy`
+
+## Terraform 対象（例）
+
+`main.sh` の `targets` 配列に定義した以下リソースを対象に apply/destroy を行います。
 
 - `aws_vpc_endpoint.ecr_api`
 - `aws_vpc_endpoint.ecr_dkr`
@@ -33,5 +44,4 @@ chmod +x scripts/cost_cut/main.sh
 
 ## 注意
 
-- `terraform destroy -auto-approve` を使用するため確認プロンプトは表示されません。
 - 実行前に対象 AWS アカウント/プロファイルと対象環境を確認してください。
