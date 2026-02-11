@@ -25,10 +25,12 @@ chmod +x scripts/cost_cut/main.sh
 
 - `up`
   - ECS cluster `sbcntr-app` の `containerInsights` を `enhanced` に変更
+  - ECS service `sbcntr-frontend-app` / `sbcntr-backend-app` の `desired_count` を `1` に変更
   - AWS CLI で `Name=sbcntr-pseudo-cloud9` かつ `stopped` の EC2 を探索し、存在すれば起動
   - `targets` 配列に定義したリソースを `terraform apply`
 - `down`
   - ECS cluster `sbcntr-app` の `containerInsights` を `enabled` に変更
+  - ECS service `sbcntr-frontend-app` / `sbcntr-backend-app` の `desired_count` を `0` に変更
   - AWS CLI で `Name=sbcntr-pseudo-cloud9` かつ `running` の EC2 を探索し、存在すれば停止
   - `targets` 配列に定義したリソースを `terraform destroy`
 

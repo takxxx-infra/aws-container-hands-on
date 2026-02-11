@@ -4,21 +4,22 @@ set -euo pipefail
 
 management_ec2_name="sbcntr-pseudo-cloud9"
 ecs_cluster_name="sbcntr-app"
+ecs_services=(
+  "sbcntr-frontend-app"
+  "sbcntr-backend-app"
+)
 targets=(
     aws_vpc_endpoint.ecr_api
     aws_vpc_endpoint.ecr_dkr
-    aws_vpc_endpoint.s3
     aws_vpc_endpoint.cw_logs
-    aws_lb.ingress
-    aws_lb_listener.ingress
   )
 
 usage() {
   cat <<EOF
 Usage: $0 [up|down]
 
-  up   : pseudo-cloud9 EC2 を起動（terraform destroy は実行しない）
-  down : pseudo-cloud9 EC2 を停止し、指定リソースを terraform destroy
+  up   : ECS desired_count を 1、pseudo-cloud9 EC2 を起動し、指定リソースを terraform apply
+  down : ECS desired_count を 0、pseudo-cloud9 EC2 を停止し、指定リソースを terraform destroy
 EOF
 }
 
@@ -76,6 +77,41 @@ set_container_insights() {
   echo "ECS cluster (${ecs_cluster_name}) の containerInsights を ${value} に設定しました。"
 }
 
+set_ecs_services_desired_count() {
+  local desired_count="$1"
+  local cluster_found
+
+  cluster_found="$(aws ecs describe-clusters \
+    --clusters "${ecs_cluster_name}" \
+    --query "length(clusters)" \
+    --output text)"
+
+  if [[ "${cluster_found}" == "0" || "${cluster_found}" == "None" ]]; then
+    echo "ECS cluster (${ecs_cluster_name}) が見つからないため、desired_count 変更をスキップします。"
+    return 0
+  fi
+
+  for service_name in "${ecs_services[@]}"; do
+    local service_status
+    service_status="$(aws ecs describe-services \
+      --cluster "${ecs_cluster_name}" \
+      --services "${service_name}" \
+      --query "services[0].status" \
+      --output text)"
+
+    if [[ "${service_status}" == "None" || "${service_status}" == "INACTIVE" ]]; then
+      echo "ECS service (${service_name}) が見つからないため、desired_count 変更をスキップします。"
+      continue
+    fi
+
+    aws ecs update-service \
+      --cluster "${ecs_cluster_name}" \
+      --service "${service_name}" \
+      --desired-count "${desired_count}" >/dev/null
+    echo "ECS service (${service_name}) の desired_count を ${desired_count} に設定しました。"
+  done
+}
+
 apply_targets() {
   local args=()
 
@@ -105,9 +141,11 @@ case "${mode}" in
     set_container_insights "enhanced"
     start_pseudo_cloud9
     apply_targets
+    set_ecs_services_desired_count "1"
     ;;
   down)
-    set_container_insights "disable"
+    set_container_insights "disabled"
+    set_ecs_services_desired_count "0"
     stop_pseudo_cloud9
     destroy_targets
     ;;

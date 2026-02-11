@@ -70,6 +70,27 @@ resource "aws_lb_listener" "ingress" {
   port              = 80
   load_balancer_arn = aws_lb.ingress.arn
   default_action {
+    type = "fixed-response"
+    fixed_response {
+      content_type = "text/plain"
+      message_body = "Not Found"
+      status_code  = "404"
+    }
+  }
+}
+
+# ##################################################
+# ALB Listener Rule
+# ##################################################
+resource "aws_lb_listener_rule" "ingress_production" {
+  listener_arn = aws_lb_listener.ingress.arn
+  priority     = 10
+  condition {
+    path_pattern {
+      values = ["/*"]
+    }
+  }
+  action {
     type = "forward"
     forward {
       target_group {
@@ -81,5 +102,8 @@ resource "aws_lb_listener" "ingress" {
         weight = 0
       }
     }
+  }
+  lifecycle {
+    ignore_changes = [action]
   }
 }
