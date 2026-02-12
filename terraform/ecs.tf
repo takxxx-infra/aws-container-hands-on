@@ -1,11 +1,4 @@
 # ##################################################
-# Locals
-# ##################################################
-locals {
-}
-
-
-# ##################################################
 # ECS Cluster
 # ##################################################
 resource "aws_ecs_cluster" "main" {
@@ -23,16 +16,16 @@ resource "aws_ecs_cluster_capacity_providers" "main" {
 }
 
 # ##################################################
-# ECS Service
+# ECS Service Frontend
 # ##################################################
 resource "aws_ecs_service" "frontend_app" {
   name                               = "${local.project_name}-frontend-app"
-  task_definition                    = aws_ecs_task_definition.frontend_app.arn
-  availability_zone_rebalancing      = "ENABLED"
   cluster                            = aws_ecs_cluster.main.arn
-  platform_version                   = "LATEST"
-  scheduling_strategy                = "REPLICA"
+  task_definition                    = aws_ecs_task_definition.frontend_app.arn
   desired_count                      = 1
+  scheduling_strategy                = "REPLICA"
+  availability_zone_rebalancing      = "ENABLED"
+  platform_version                   = "LATEST"
   deployment_maximum_percent         = 200
   deployment_minimum_healthy_percent = 100
   enable_ecs_managed_tags            = true
@@ -40,12 +33,6 @@ resource "aws_ecs_service" "frontend_app" {
   health_check_grace_period_seconds  = 60
   propagate_tags                     = "NONE"
 
-
-  capacity_provider_strategy {
-    capacity_provider = "FARGATE"
-    base              = 0
-    weight            = 1
-  }
   deployment_controller {
     type = "ECS"
   }
@@ -56,6 +43,11 @@ resource "aws_ecs_service" "frontend_app" {
   deployment_circuit_breaker {
     enable   = true
     rollback = true
+  }
+  capacity_provider_strategy {
+    capacity_provider = "FARGATE"
+    base              = 0
+    weight            = 1
   }
 
   load_balancer {
@@ -78,29 +70,25 @@ resource "aws_ecs_service" "frontend_app" {
   }
 }
 
+# ##################################################
+# ECS Service Backend
+# ##################################################
 resource "aws_ecs_service" "backend_app" {
   name                               = "${local.project_name}-backend-app"
-  task_definition                    = aws_ecs_task_definition.backend_app.arn
-  availability_zone_rebalancing      = "ENABLED"
   cluster                            = aws_ecs_cluster.main.arn
+  task_definition                    = aws_ecs_task_definition.backend_app.arn
+  desired_count                      = 1
+  force_new_deployment               = true
+  scheduling_strategy                = "REPLICA"
+  availability_zone_rebalancing      = "ENABLED"
+  platform_version                   = "1.4.0"
   deployment_maximum_percent         = 200
   deployment_minimum_healthy_percent = 100
-  desired_count                      = 1
   enable_ecs_managed_tags            = true
   enable_execute_command             = false
   health_check_grace_period_seconds  = 60
-  launch_type                        = "FARGATE"
+  propagate_tags                     = "NONE"
 
-  platform_version    = "1.4.0"
-  propagate_tags      = "NONE"
-  region              = "ap-northeast-1"
-  scheduling_strategy = "REPLICA"
-  tags = {
-    Project = "sbcntr"
-  }
-  tags_all = {
-    Project = "sbcntr"
-  }
   deployment_circuit_breaker {
     enable   = false
     rollback = false
@@ -112,6 +100,14 @@ resource "aws_ecs_service" "backend_app" {
   deployment_controller {
     type = "ECS"
   }
+  capacity_provider_strategy {
+    capacity_provider = "FARGATE"
+    base              = 0
+    weight            = 1
+  }
+  service_registries {
+    registry_arn = aws_service_discovery_service.sbcntr.arn
+  }
   network_configuration {
     assign_public_ip = false
     security_groups  = [aws_security_group.backend_app.id]
@@ -120,8 +116,11 @@ resource "aws_ecs_service" "backend_app" {
       aws_subnet.this["private-app-c"].id
     ]
   }
-  service_registries {
-    registry_arn = aws_service_discovery_service.sbcntr.arn
+  tags = {
+    Project = "sbcntr"
+  }
+  tags_all = {
+    Project = "sbcntr"
   }
 }
 

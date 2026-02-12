@@ -3,7 +3,18 @@
 # ##################################################
 resource "aws_ecs_task_definition" "frontend_app" {
   container_definitions = jsonencode([{
-    name = "app"
+    name              = "app"
+    image             = "${data.aws_caller_identity.current.account_id}.dkr.ecr.${local.region}.amazonaws.com/sbcntr-frontend-app:v1.0.1"
+    cpu               = 0
+    memoryReservation = 512
+    portMappings = [{
+      appProtocol   = "http"
+      containerPort = 8080
+      hostPort      = 8080
+      name          = "app-8080-tcp"
+      protocol      = "tcp"
+    }]
+    essential = true
     environment = [{
       name  = "BACKEND_FQDN"
       value = "backend-app.sbcntr.local"
@@ -11,9 +22,11 @@ resource "aws_ecs_task_definition" "frontend_app" {
       name  = "BACKEND_PORT"
       value = "8081"
     }]
-    environmentFiles = []
-    essential        = true
-    image            = "${data.aws_caller_identity.current.account_id}.dkr.ecr.${local.region}.amazonaws.com/sbcntr-frontend-app:v1"
+    environmentFiles       = []
+    mountPoints            = []
+    volumesFrom            = []
+    readonlyRootFilesystem = true
+    ulimits                = []
     logConfiguration = {
       logDriver = "awslogs"
       options = {
@@ -25,18 +38,7 @@ resource "aws_ecs_task_definition" "frontend_app" {
       secretOptions = []
     }
     memoryReservation = 512
-    mountPoints       = []
-    portMappings = [{
-      appProtocol   = "http"
-      containerPort = 8080
-      hostPort      = 8080
-      name          = "app-8080-tcp"
-      protocol      = "tcp"
-    }]
-    readonlyRootFilesystem = true
-    systemControls         = []
-    ulimits                = []
-    volumesFrom            = []
+    systemControls    = []
   }])
   cpu                      = "512"
   enable_fault_injection   = false
@@ -58,20 +60,30 @@ resource "aws_ecs_task_definition" "frontend_app" {
 
 resource "aws_ecs_task_definition" "backend_app" {
   container_definitions = jsonencode([{
-    command               = []
-    cpu                   = 256
-    credentialSpecs       = []
-    dnsSearchDomains      = []
-    dnsServers            = []
-    dockerLabels          = {}
-    dockerSecurityOptions = []
+    name              = "app"
+    image             = "${data.aws_caller_identity.current.account_id}.dkr.ecr.${local.region}.amazonaws.com/sbcntr-backend-app:v1"
+    cpu               = 256
+    memoryReservation = 256
+    links             = []
+    portMappings = [{
+      containerPort = 8081
+      hostPort      = 8081
+      protocol      = "tcp"
+    }]
+    essential             = true
     entryPoint            = []
+    command               = []
     environment           = []
     environmentFiles      = []
-    essential             = true
+    mountPoints           = []
+    volumesFrom           = []
+    secrets               = []
+    dnsServers            = []
+    dnsSearchDomains      = []
     extraHosts            = []
-    image                 = "${data.aws_caller_identity.current.account_id}.dkr.ecr.${local.region}.amazonaws.com/sbcntr-backend-app:v1"
-    links                 = []
+    dockerSecurityOptions = []
+    dockerLabels          = {}
+    ulimits               = []
     logConfiguration = {
       logDriver = "awslogs"
       options = {
@@ -81,18 +93,8 @@ resource "aws_ecs_task_definition" "backend_app" {
       }
       secretOptions = []
     }
-    memoryReservation = 256
-    mountPoints       = []
-    name              = "app"
-    portMappings = [{
-      containerPort = 8081
-      hostPort      = 8081
-      protocol      = "tcp"
-    }]
-    secrets        = []
-    systemControls = []
-    ulimits        = []
-    volumesFrom    = []
+    systemControls  = []
+    credentialSpecs = []
   }])
   cpu                      = "256"
   enable_fault_injection   = false
@@ -102,11 +104,8 @@ resource "aws_ecs_task_definition" "backend_app" {
   memory                   = "512"
   network_mode             = "awsvpc"
   pid_mode                 = null
-  region                   = "ap-northeast-1"
   requires_compatibilities = ["FARGATE"]
   skip_destroy             = null
-  tags                     = {}
-  tags_all                 = {}
   task_role_arn            = null
   track_latest             = false
   runtime_platform {
