@@ -8,7 +8,6 @@ locals {
   }
 }
 
-
 # ##################################################
 # ECS Task Definition
 # ##################################################
@@ -53,7 +52,7 @@ resource "aws_ecs_task_definition" "frontend_app" {
   }])
   cpu                      = "512"
   enable_fault_injection   = false
-  execution_role_arn       = "arn:aws:iam::${data.aws_caller_identity.current.account_id}:role/ecsTaskExecutionRole"
+  execution_role_arn       = aws_iam_role.ecs_task_execution.arn
   family                   = "sbcntr-frontend-app"
   ipc_mode                 = null
   memory                   = "1024"
@@ -61,7 +60,7 @@ resource "aws_ecs_task_definition" "frontend_app" {
   pid_mode                 = null
   requires_compatibilities = ["FARGATE"]
   skip_destroy             = null
-  task_role_arn            = null
+  task_role_arn            = aws_iam_role.ecs_task.arn
   track_latest             = false
   runtime_platform {
     cpu_architecture        = "ARM64"
@@ -131,7 +130,7 @@ resource "aws_ecs_task_definition" "backend_app" {
   }])
   cpu                      = "256"
   enable_fault_injection   = false
-  execution_role_arn       = "arn:aws:iam::${data.aws_caller_identity.current.account_id}:role/ecsTaskExecutionRole"
+  execution_role_arn       = aws_iam_role.ecs_task_execution.arn
   family                   = "sbcntr-backend-app"
   ipc_mode                 = null
   memory                   = "512"
@@ -139,7 +138,7 @@ resource "aws_ecs_task_definition" "backend_app" {
   pid_mode                 = null
   requires_compatibilities = ["FARGATE"]
   skip_destroy             = null
-  task_role_arn            = null
+  task_role_arn            = aws_iam_role.ecs_task.arn
   track_latest             = false
   runtime_platform {
     cpu_architecture        = "ARM64"

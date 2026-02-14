@@ -57,12 +57,77 @@ resource "aws_iam_role_policy_attachment" "ecs_deployment" {
 }
 
 # ##################################################
-# ECS Task Execution ROle
+# ECS Task Execution Role
 # ##################################################
+resource "aws_iam_role" "ecs_task_execution" {
+  name = "ecsTaskExecutionRole"
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Action = "sts:AssumeRole"
+      Effect = "Allow"
+      Principal = {
+        Service = "ecs-tasks.amazonaws.com"
+      }
+    }]
+  })
+}
+
 resource "aws_iam_role_policy_attachment" "ecs_task_execution" {
   for_each = {
-    secret = aws_iam_policy.get_secret_sbcntr.arn
+    ecs_task = "arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy"
+    secret   = aws_iam_policy.get_secret_sbcntr.arn
   }
-  role       = "ecsTaskExecutionRole"
+  role       = aws_iam_role.ecs_task_execution.name
+  policy_arn = each.value
+}
+
+# ##################################################
+# ECS Task Role
+# ##################################################
+resource "aws_iam_role" "ecs_task" {
+  name = "SbcntrEcsTaskRole"
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Action = "sts:AssumeRole"
+      Effect = "Allow"
+      Principal = {
+        Service = "ecs-tasks.amazonaws.com"
+      }
+    }]
+  })
+}
+
+resource "aws_iam_role_policy_attachment" "ecs_task" {
+  for_each = {
+    ssm = "arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore"
+  }
+  role       = aws_iam_role.ecs_task.name
+  policy_arn = each.value
+}
+
+# ##################################################
+# RDS Monitoring Role
+# ##################################################
+resource "aws_iam_role" "rds_monitoring" {
+  name = "rds-monitoring-role"
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Action = "sts:AssumeRole"
+      Effect = "Allow"
+      Principal = {
+        Service = "monitoring.rds.amazonaws.com"
+      }
+    }]
+  })
+}
+
+resource "aws_iam_role_policy_attachment" "rds_monitoring" {
+  for_each = {
+    rds_monitoring = "arn:aws:iam::aws:policy/service-role/AmazonRDSEnhancedMonitoringRole"
+  }
+  role       = aws_iam_role.rds_monitoring.name
   policy_arn = each.value
 }

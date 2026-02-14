@@ -17,14 +17,15 @@ resource "aws_db_subnet_group" "main" {
 # Aurora Cluster
 # ##################################################
 resource "aws_rds_cluster" "main" {
-  cluster_identifier       = "${local.project_name}-main"
-  engine                   = "aurora-postgresql"
-  engine_version           = "17.4"
-  engine_mode              = "provisioned"
-  engine_lifecycle_support = "open-source-rds-extended-support-disabled"
-  database_name            = "app"
-  master_username          = "sbcntradmin"
-  port                     = 5432
+  cluster_identifier          = "${local.project_name}-main"
+  engine                      = "aurora-postgresql"
+  engine_version              = "17.4"
+  engine_mode                 = "provisioned"
+  engine_lifecycle_support    = "open-source-rds-extended-support-disabled"
+  database_name               = "app"
+  master_username             = "sbcntradmin"
+  manage_master_user_password = true
+  port                        = 5432
 
   db_subnet_group_name            = aws_db_subnet_group.main.name
   db_cluster_parameter_group_name = "default.aurora-postgresql17"
@@ -44,7 +45,7 @@ resource "aws_rds_cluster" "main" {
   iam_database_authentication_enabled = false
 
   monitoring_interval                   = 60
-  monitoring_role_arn                   = "arn:aws:iam::455322614919:role/rds-monitoring-role"
+  monitoring_role_arn                   = aws_iam_role.rds_monitoring.arn
   database_insights_mode                = "standard"
   performance_insights_enabled          = true
   performance_insights_retention_period = 7
