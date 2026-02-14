@@ -106,8 +106,13 @@ set_ecs_services_desired_count() {
       --query "services[0].status" \
       --output text)"
 
-    if [[ "${service_status}" == "None" || "${service_status}" == "INACTIVE" ]]; then
+    if [[ -z "${service_status}" || "${service_status}" == "None" ]]; then
       echo "ECS service (${service_name}) が見つからないため、desired_count 変更をスキップします。"
+      continue
+    fi
+
+    if [[ "${service_status}" != "ACTIVE" ]]; then
+      echo "ECS service (${service_name}) の status=${service_status} のため、desired_count 変更をスキップします。"
       continue
     fi
 
@@ -197,8 +202,8 @@ case "${mode}" in
     set_container_insights "disabled"
     set_ecs_services_desired_count "0"
     stop_pseudo_cloud9
-    destroy_targets
     stop_rds_cluster
+    destroy_targets
     ;;
   *)
     usage
