@@ -5,6 +5,7 @@ set -euo pipefail
 management_ec2_name="sbcntr-pseudo-cloud9"
 ecs_cluster_name="sbcntr-app"
 rds_cluster_identifier="sbcntr-main"
+terraform_dir="$(cd "$(dirname "$0")/../../terraform/chapter5" && pwd)"
 ecs_services=(
   "sbcntr-frontend-app"
   "sbcntr-backend-app"
@@ -14,6 +15,10 @@ targets=(
     aws_vpc_endpoint.ecr_dkr
     aws_vpc_endpoint.cw_logs
     aws_vpc_endpoint.secretsmanager
+    aws_vpc_endpoint.ssmmessages
+    aws_lb_listener.ingress
+    aws_lb_listener_rule.ingress_production
+    aws_lb.ingress
   )
 
 usage() {
@@ -163,7 +168,7 @@ apply_targets() {
     args+=("-target=$t")
   done
 
-  cd "$(dirname "$0")/../../terraform"
+  cd "${terraform_dir}"
   terraform apply "${args[@]}"
 }
 
@@ -174,7 +179,7 @@ destroy_targets() {
     args+=("-target=$t")
   done
 
-  cd "$(dirname "$0")/../../terraform"
+  cd "${terraform_dir}"
   terraform destroy "${args[@]}"
 }
 
