@@ -32,8 +32,12 @@
 4. `terraform plan` で差分を確認する
 5. `terraform apply` で反映する
 
+## コスト削減スクリプト
+
+コストカット用の運用スクリプトを `scripts/cost_cut/` に配置しています。  
+詳細な使い方は `scripts/cost_cut/README.md` を参照してください。
+
 ## リポジトリ方針
 
 - ハンズオンで構築したリソースは、可能な限り Terraform 管理下に置く
 - 手動変更（コンソール操作）を行った場合は、Terraform コードへ必ず反映する
-
