@@ -22,7 +22,7 @@ resource "aws_ecs_service" "frontend_app" {
   name                               = "${local.project_name}-frontend-app"
   cluster                            = aws_ecs_cluster.main.arn
   task_definition                    = aws_ecs_task_definition.frontend_app.arn
-  desired_count                      = 1
+  desired_count                      = 0
   scheduling_strategy                = "REPLICA"
   availability_zone_rebalancing      = "ENABLED"
   platform_version                   = "LATEST"
@@ -68,6 +68,10 @@ resource "aws_ecs_service" "frontend_app" {
       aws_subnet.this["private-app-c"].id
     ]
   }
+
+  lifecycle {
+    ignore_changes = [desired_count]
+  }
 }
 
 # ##################################################
@@ -77,7 +81,7 @@ resource "aws_ecs_service" "backend_app" {
   name                               = "${local.project_name}-backend-app"
   cluster                            = aws_ecs_cluster.main.arn
   task_definition                    = aws_ecs_task_definition.backend_app.arn
-  desired_count                      = 1
+  desired_count                      = 0
   force_new_deployment               = true
   scheduling_strategy                = "REPLICA"
   availability_zone_rebalancing      = "ENABLED"
@@ -116,11 +120,8 @@ resource "aws_ecs_service" "backend_app" {
       aws_subnet.this["private-app-c"].id
     ]
   }
-  tags = {
-    Project = "sbcntr"
-  }
-  tags_all = {
-    Project = "sbcntr"
+  lifecycle {
+    ignore_changes = [desired_count]
   }
 }
 

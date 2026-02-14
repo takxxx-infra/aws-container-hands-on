@@ -2,36 +2,24 @@
 # Locals
 # ##################################################
 locals {
-  target_group = {
-    frontapp-blue = {
-      target_type      = "ip"
-      protocol         = "HTTP"
-      port             = 8080
-      ip_address_type  = "ipv4"
-      protocol_version = "HTTP1"
-    }
-    frontapp-green = {
-      target_type      = "ip"
-      protocol         = "HTTP"
-      port             = 8080
-      ip_address_type  = "ipv4"
-      protocol_version = "HTTP1"
-    }
-  }
+  target_groups = toset([
+    "frontapp-blue",
+    "frontapp-green"
+  ])
 }
 
 # ##################################################
 # Target Group
 # ##################################################
 resource "aws_lb_target_group" "this" {
-  for_each         = local.target_group
+  for_each         = local.target_groups
   name             = "${local.project_name}-${each.key}"
-  target_type      = each.value.target_type
-  protocol         = each.value.protocol
-  port             = each.value.port
-  ip_address_type  = each.value.ip_address_type
+  target_type      = "ip"
+  protocol         = "HTTP"
+  port             = 8080
+  ip_address_type  = "ipv4"
   vpc_id           = aws_vpc.main.id
-  protocol_version = each.value.protocol_version
+  protocol_version = "HTTP1"
   health_check {
     protocol            = "HTTP"
     path                = "/healthcheck"
@@ -104,6 +92,6 @@ resource "aws_lb_listener_rule" "ingress_production" {
     }
   }
   lifecycle {
-    ignore_changes = [action]
+    ignore_changes = [action] // ECS Blue/Green Deployment によって動的にweightが変更されるため
   }
 }

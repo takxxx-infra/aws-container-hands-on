@@ -11,15 +11,15 @@ ecs_services=(
   "sbcntr-backend-app"
 )
 targets=(
-    aws_vpc_endpoint.ecr_api
-    aws_vpc_endpoint.ecr_dkr
-    aws_vpc_endpoint.cw_logs
-    aws_vpc_endpoint.secretsmanager
-    aws_vpc_endpoint.ssmmessages
-    aws_lb_listener.ingress
-    aws_lb_listener_rule.ingress_production
-    aws_lb.ingress
-  )
+  aws_vpc_endpoint.interface["ecr-api"]
+  aws_vpc_endpoint.interface["ecr-dkr"]
+  aws_vpc_endpoint.interface["logs"]
+  aws_vpc_endpoint.interface["secrets-manager"]
+  aws_vpc_endpoint.interface["ssmmessages"]
+  aws_lb_listener.ingress
+  aws_lb_listener_rule.ingress_production
+  aws_lb.ingress
+)
 
 usage() {
   cat <<EOF
