@@ -55,3 +55,14 @@ resource "aws_iam_role_policy_attachment" "ecs_deployment" {
   role       = aws_iam_role.ecs_deployment.name
   policy_arn = each.value
 }
+
+# ##################################################
+# ECS Task Execution ROle
+# ##################################################
+resource "aws_iam_role_policy_attachment" "ecs_task_execution" {
+  for_each = {
+    secret = aws_iam_policy.get_secret_sbcntr.arn
+  }
+  role       = "ecsTaskExecutionRole"
+  policy_arn = each.value
+}

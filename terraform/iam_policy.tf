@@ -45,3 +45,22 @@ resource "aws_iam_policy" "ecs_service_update" {
     ]
   })
 }
+
+# ##################################################
+# SbcntrGettingSecretPolicy
+# ##################################################
+resource "aws_iam_policy" "get_secret_sbcntr" {
+  name = "SbcntrGettingSecretPolicy"
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = [
+          "secretsmanager:GetSecretValue"
+        ]
+        Resource = "${aws_secretsmanager_secret.db_app_user.arn}"
+      }
+    ]
+  })
+}

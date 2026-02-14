@@ -4,6 +4,7 @@ set -euo pipefail
 
 management_ec2_name="sbcntr-pseudo-cloud9"
 ecs_cluster_name="sbcntr-app"
+rds_cluster_identifier="sbcntr-main"
 ecs_services=(
   "sbcntr-frontend-app"
   "sbcntr-backend-app"
@@ -12,14 +13,15 @@ targets=(
     aws_vpc_endpoint.ecr_api
     aws_vpc_endpoint.ecr_dkr
     aws_vpc_endpoint.cw_logs
+    aws_vpc_endpoint.secretsmanager
   )
 
 usage() {
   cat <<EOF
 Usage: $0 [up|down]
 
-  up   : ECS desired_count を 1、pseudo-cloud9 EC2 を起動し、指定リソースを terraform apply
-  down : ECS desired_count を 0、pseudo-cloud9 EC2 を停止し、指定リソースを terraform destroy
+  up   : RDS cluster 起動、ECS desired_count を 1、pseudo-cloud9 EC2 を起動し、指定リソースを terraform apply
+  down : ECS desired_count を 0、pseudo-cloud9 EC2 を停止し、指定リソースを terraform destroy、RDS cluster 停止
 EOF
 }
 
@@ -112,6 +114,48 @@ set_ecs_services_desired_count() {
   done
 }
 
+start_rds_cluster() {
+  local cluster_status
+  cluster_status="$(aws rds describe-db-clusters \
+    --db-cluster-identifier "${rds_cluster_identifier}" \
+    --query "DBClusters[0].Status" \
+    --output text 2>/dev/null || true)"
+
+  if [[ -z "${cluster_status}" || "${cluster_status}" == "None" ]]; then
+    echo "RDS cluster (${rds_cluster_identifier}) が見つからないため、起動をスキップします。"
+    return 0
+  fi
+
+  if [[ "${cluster_status}" == "available" ]]; then
+    echo "RDS cluster (${rds_cluster_identifier}) はすでに起動中です。"
+    return 0
+  fi
+
+  aws rds start-db-cluster --db-cluster-identifier "${rds_cluster_identifier}" >/dev/null
+  echo "RDS cluster (${rds_cluster_identifier}) の起動を開始しました。"
+}
+
+stop_rds_cluster() {
+  local cluster_status
+  cluster_status="$(aws rds describe-db-clusters \
+    --db-cluster-identifier "${rds_cluster_identifier}" \
+    --query "DBClusters[0].Status" \
+    --output text 2>/dev/null || true)"
+
+  if [[ -z "${cluster_status}" || "${cluster_status}" == "None" ]]; then
+    echo "RDS cluster (${rds_cluster_identifier}) が見つからないため、停止をスキップします。"
+    return 0
+  fi
+
+  if [[ "${cluster_status}" == "stopped" ]]; then
+    echo "RDS cluster (${rds_cluster_identifier}) はすでに停止中です。"
+    return 0
+  fi
+
+  aws rds stop-db-cluster --db-cluster-identifier "${rds_cluster_identifier}" >/dev/null
+  echo "RDS cluster (${rds_cluster_identifier}) の停止を開始しました。"
+}
+
 apply_targets() {
   local args=()
 
@@ -138,6 +182,7 @@ mode="${1:-down}"
 
 case "${mode}" in
   up)
+    start_rds_cluster
     set_container_insights "enhanced"
     start_pseudo_cloud9
     apply_targets
@@ -148,6 +193,7 @@ case "${mode}" in
     set_ecs_services_desired_count "0"
     stop_pseudo_cloud9
     destroy_targets
+    stop_rds_cluster
     ;;
   *)
     usage

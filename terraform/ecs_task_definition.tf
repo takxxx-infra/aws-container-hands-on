@@ -1,10 +1,21 @@
 # ##################################################
+# Locals
+# ##################################################
+locals {
+  image_tag = {
+    frontend_app = "v1.0.1"
+    backend_app  = "v1"
+  }
+}
+
+
+# ##################################################
 # ECS Task Definition
 # ##################################################
 resource "aws_ecs_task_definition" "frontend_app" {
   container_definitions = jsonencode([{
     name              = "app"
-    image             = "${data.aws_caller_identity.current.account_id}.dkr.ecr.${local.region}.amazonaws.com/sbcntr-frontend-app:v1.0.1"
+    image             = "${data.aws_caller_identity.current.account_id}.dkr.ecr.${local.region}.amazonaws.com/sbcntr-frontend-app:${local.image_tag.frontend_app}"
     cpu               = 0
     memoryReservation = 512
     portMappings = [{
@@ -61,7 +72,7 @@ resource "aws_ecs_task_definition" "frontend_app" {
 resource "aws_ecs_task_definition" "backend_app" {
   container_definitions = jsonencode([{
     name              = "app"
-    image             = "${data.aws_caller_identity.current.account_id}.dkr.ecr.${local.region}.amazonaws.com/sbcntr-backend-app:v1"
+    image             = "${data.aws_caller_identity.current.account_id}.dkr.ecr.${local.region}.amazonaws.com/sbcntr-backend-app:${local.image_tag.backend_app}"
     cpu               = 256
     memoryReservation = 256
     links             = []
@@ -70,14 +81,36 @@ resource "aws_ecs_task_definition" "backend_app" {
       hostPort      = 8081
       protocol      = "tcp"
     }]
-    essential             = true
-    entryPoint            = []
-    command               = []
-    environment           = []
+    essential  = true
+    entryPoint = []
+    command    = []
+    environment = [
+      {
+        name  = "DB_NAME"
+        value = "${aws_rds_cluster.main.database_name}"
+      },
+      {
+        name  = "DB_CONN"
+        value = "1"
+      }
+    ]
+    secrets = [
+      {
+        name      = "DB_HOST"
+        valueFrom = "${aws_secretsmanager_secret.db_app_user.arn}:host::"
+      },
+      {
+        name      = "DB_USERNAME"
+        valueFrom = "${aws_secretsmanager_secret.db_app_user.arn}:username::"
+      },
+      {
+        name      = "DB_PASSWORD"
+        valueFrom = "${aws_secretsmanager_secret.db_app_user.arn}:password::"
+      },
+    ]
     environmentFiles      = []
     mountPoints           = []
     volumesFrom           = []
-    secrets               = []
     dnsServers            = []
     dnsSearchDomains      = []
     extraHosts            = []
