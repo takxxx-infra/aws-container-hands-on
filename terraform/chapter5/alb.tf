@@ -55,7 +55,21 @@ resource "aws_lb" "ingress" {
 # ##################################################
 resource "aws_lb_listener" "ingress" {
   protocol          = "HTTP"
-  port              = 80
+  port              = local.port.http.alb
+  load_balancer_arn = aws_lb.ingress.arn
+  default_action {
+    type = "fixed-response"
+    fixed_response {
+      content_type = "text/plain"
+      message_body = "Not Found"
+      status_code  = "404"
+    }
+  }
+}
+
+resource "aws_lb_listener" "ingress_test" {
+  protocol          = "HTTP"
+  port              = local.port.http.alb_test
   load_balancer_arn = aws_lb.ingress.arn
   default_action {
     type = "fixed-response"
@@ -72,6 +86,32 @@ resource "aws_lb_listener" "ingress" {
 # ##################################################
 resource "aws_lb_listener_rule" "ingress_production" {
   listener_arn = aws_lb_listener.ingress.arn
+  priority     = 10
+  condition {
+    path_pattern {
+      values = ["/*"]
+    }
+  }
+  action {
+    type = "forward"
+    forward {
+      target_group {
+        arn    = aws_lb_target_group.this["frontapp-blue"].arn
+        weight = 1
+      }
+      target_group {
+        arn    = aws_lb_target_group.this["frontapp-green"].arn
+        weight = 0
+      }
+    }
+  }
+  lifecycle {
+    ignore_changes = [action] // ECS Blue/Green Deployment によって動的にweightが変更されるため
+  }
+}
+
+resource "aws_lb_listener_rule" "ingress_test" {
+  listener_arn = aws_lb_listener.ingress_test.arn
   priority     = 10
   condition {
     path_pattern {

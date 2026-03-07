@@ -3,7 +3,7 @@
 # ##################################################
 locals {
   image_tag = {
-    frontend_app = "v1.0.1"
+    frontend_app = "v3"
     backend_app  = "v1"
   }
 }

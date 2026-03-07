@@ -57,6 +57,37 @@ resource "aws_iam_role_policy_attachment" "ecs_deployment" {
 }
 
 # ##################################################
+# ECS Blue/Green Approval
+# ##################################################
+resource "aws_iam_role" "ecs_bg_approval_lambda" {
+  name = "${local.approval_lambda_name}-role"
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Action = "sts:AssumeRole"
+      Effect = "Allow"
+      Principal = {
+        Service = "lambda.amazonaws.com"
+      }
+    }]
+  })
+}
+
+resource "aws_iam_role" "ecs_lifecycle_hook" {
+  name = "${local.project_name}-ecs-lifecycle-hook"
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Action = "sts:AssumeRole"
+      Effect = "Allow"
+      Principal = {
+        Service = "ecs.amazonaws.com"
+      }
+    }]
+  })
+}
+
+# ##################################################
 # ECS Task Execution Role
 # ##################################################
 resource "aws_iam_role" "ecs_task_execution" {

@@ -15,4 +15,5 @@ resource "aws_ecr_repository" "this" {
   for_each             = local.ecr
   name                 = "${local.project_name}-${each.key}"
   image_tag_mutability = "MUTABLE"
+  force_delete         = true
 }

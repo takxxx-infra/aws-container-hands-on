@@ -39,6 +39,19 @@ resource "aws_ecs_service" "frontend_app" {
   deployment_configuration {
     strategy             = "BLUE_GREEN"
     bake_time_in_minutes = "10"
+
+    lifecycle_hook {
+      hook_target_arn = aws_lambda_function.ecs_bg_approval.arn
+      role_arn        = aws_iam_role.ecs_lifecycle_hook.arn
+      lifecycle_stages = [
+        "POST_TEST_TRAFFIC_SHIFT"
+      ]
+      hook_details = jsonencode({
+        ActionGroup = local.approval_action_group
+        ClusterArn  = aws_ecs_cluster.main.arn
+        ServiceName = "${local.project_name}-frontend-app"
+      })
+    }
   }
   deployment_circuit_breaker {
     enable   = true
@@ -57,6 +70,7 @@ resource "aws_ecs_service" "frontend_app" {
     advanced_configuration {
       alternate_target_group_arn = aws_lb_target_group.this["frontapp-green"].arn
       production_listener_rule   = aws_lb_listener_rule.ingress_production.arn
+      test_listener_rule         = aws_lb_listener_rule.ingress_test.arn
       role_arn                   = aws_iam_role.ecs_deployment.arn
     }
   }
@@ -72,6 +86,11 @@ resource "aws_ecs_service" "frontend_app" {
   lifecycle {
     ignore_changes = [desired_count]
   }
+
+  depends_on = [
+    aws_iam_role_policy.ecs_lifecycle_hook,
+    aws_lambda_permission.ecs_lifecycle_hook,
+  ]
 }
 
 # ##################################################

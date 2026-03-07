@@ -5,6 +5,7 @@ locals {
   port = {
     http = {
       alb          = 80
+      alb_test     = 10080
       frontend_app = 8080
       backend_app  = 8081
     }
@@ -38,6 +39,22 @@ resource "aws_vpc_security_group_ingress_rule" "ingress_ipv6" {
   ip_protocol       = "tcp"
   from_port         = local.port.http.alb
   to_port           = local.port.http.alb
+  cidr_ipv6         = "::/0"
+}
+
+resource "aws_vpc_security_group_ingress_rule" "ingress_test_ipv4" {
+  security_group_id = aws_security_group.ingress.id
+  ip_protocol       = "tcp"
+  from_port         = local.port.http.alb_test
+  to_port           = local.port.http.alb_test
+  cidr_ipv4         = "0.0.0.0/0"
+}
+
+resource "aws_vpc_security_group_ingress_rule" "ingress_test_ipv6" {
+  security_group_id = aws_security_group.ingress.id
+  ip_protocol       = "tcp"
+  from_port         = local.port.http.alb_test
+  to_port           = local.port.http.alb_test
   cidr_ipv6         = "::/0"
 }
 
