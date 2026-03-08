@@ -11,14 +11,15 @@ ecs_services=(
   "sbcntr-backend-app"
 )
 targets=(
-  aws_vpc_endpoint.interface["ecr-api"]
-  aws_vpc_endpoint.interface["ecr-dkr"]
-  aws_vpc_endpoint.interface["logs"]
-  aws_vpc_endpoint.interface["secrets-manager"]
-  aws_vpc_endpoint.interface["ssmmessages"]
+  aws_vpc_endpoint.interface[\"ecr-api\"]
+  aws_vpc_endpoint.interface[\"ecr-dkr\"]
+  aws_vpc_endpoint.interface[\"logs\"]
+  aws_vpc_endpoint.interface[\"secrets-manager\"]
+  aws_vpc_endpoint.interface[\"ssmmessages\"]
   aws_lb_listener.ingress
   aws_lb_listener_rule.ingress_production
   aws_lb.ingress
+  aws_ecs_service.frontend_app
 )
 
 usage() {
@@ -157,8 +158,8 @@ stop_rds_cluster() {
     return 0
   fi
 
-  if [[ "${cluster_status}" == "stopped" ]]; then
-    echo "RDS cluster (${rds_cluster_identifier}) はすでに停止中です。"
+  if [[ "${cluster_status}" == "stopped" || "${cluster_status}" == "stopping" ]]; then
+    echo "RDS cluster (${rds_cluster_identifier}) はすでに停止処理中または停止済みです (status=${cluster_status})。"
     return 0
   fi
 
@@ -188,7 +189,7 @@ destroy_targets() {
   terraform destroy "${args[@]}"
 }
 
-mode="${1:-down}"
+mode="${1:-*}"
 
 case "${mode}" in
   up)

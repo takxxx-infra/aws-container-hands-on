@@ -46,3 +46,6 @@ sbcntr_resources/
 # DS_Store
 .DS_Store
 **/.DS_Store
+
+# codex
+.codex/
