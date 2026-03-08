@@ -88,7 +88,7 @@ resource "aws_ecs_service" "frontend_app" {
   }
 
   depends_on = [
-    aws_iam_role_policy.ecs_lifecycle_hook,
+    aws_iam_policy.ecs_lifecycle_hook,
     aws_lambda_permission.ecs_lifecycle_hook,
   ]
 }

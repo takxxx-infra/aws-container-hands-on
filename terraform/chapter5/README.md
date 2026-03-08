@@ -12,12 +12,14 @@
 動作概要は以下です。
 
 1. ECS のテストトラフィック切替後に Lambda が呼ばれます。
-2. 承認パラメータとロールバック要求パラメータの両方が無ければ SNS に custom notification を publish します。
-3. Slack に `再ルーティング` / `ロールバック` ボタン付き通知が届きます。
-4. `再ルーティング` で承認パラメータを作成します。
-5. `ロールバック` でロールバック要求パラメータを作成します。
-6. 次回 Lambda 呼び出しで `approved` があれば `SUCCEEDED` を返し、本番切替を再開します。
-7. 次回 Lambda 呼び出しで `rollback` があれば `FAILED` を返し、ECS のロールバックへ進みます。
+2. 初回デプロイで source revision が存在しない場合は、Slack 通知せず `SUCCEEDED` を返して次の stage へ進みます。
+3. 通常デプロイで承認パラメータとロールバック要求パラメータの両方が無ければ SNS に custom notification を publish します。
+4. Slack に `再ルーティング` / `ロールバック` ボタン付き通知が届きます。
+5. `再ルーティング` で承認パラメータを作成します。
+6. `ロールバック` でロールバック要求パラメータを作成します。
+7. 次回 Lambda 呼び出しで `approved` があれば `SUCCEEDED` を返し、本番切替を再開します。
+8. 次回 Lambda 呼び出しで `rollback` があれば `FAILED` を返し、ECS のロールバックへ進みます。
+9. `SUCCEEDED` / `FAILED` を返す直前に、deployment 単位の SSM パラメータを自動削除します。
 
 ## 追加ファイル
 - `variables.tf`
@@ -55,6 +57,8 @@
 - `lambda_memory_size`
 - `callback_delay_seconds`
 
+`callback_delay_seconds` に `0` を指定すると、Lambda は `callBackDelay` を返さず ECS のデフォルト再実行間隔 30 秒を使います。
+
 ### 変数例
 ```hcl
 approval_sns_topic_arn     = "arn:aws:sns:ap-northeast-1:123456789012:sbcntr-q-approval"
@@ -64,7 +68,7 @@ chatbot_execution_role_arn = "arn:aws:iam::123456789012:role/AmazonQDeveloperCha
 chatbot_region             = "ap-southeast-1"
 lambda_timeout             = 30
 lambda_memory_size         = 256
-callback_delay_seconds     = 60
+callback_delay_seconds     = 0
 ```
 
 ## Slack channel configuration ARN の指定方法
@@ -133,6 +137,7 @@ custom action 定義は `awscc_chatbot_custom_action` で Terraform 管理しま
 - 通知済みマーカー: `.../notification-sent`
 
 Lambda は `notification-sent` を `Overwrite=false` で作成できた最初の 1 回だけ SNS に publish します。
+終端判定で `SUCCEEDED` または `FAILED` を返すタイミングでは、これら 3 つのパラメータを自動削除します。
 
 ## 出力値
 主な出力値は以下です。
@@ -156,8 +161,9 @@ Lambda は `notification-sent` を `Overwrite=false` で作成できた最初の
 - custom action の `CommandText` は Amazon Q の CLI 構文に合わせ、`aws` プレフィックスなしで定義しています。
 - `ロールバック` アクションは `ssm put-parameter --name $R --value rollback --type String --overwrite --region ...` を使っています。
 - custom action の `Variables` は custom notification の `metadata.additionalContext` から値を引く前提です。
-- `ロールバック` は即時反映ではなく、次回の lifecycle hook callback で Lambda が `FAILED` を返したタイミングで反映されます。現状の最大待ち時間は `callback_delay_seconds` の 60 秒です。
-- Lambda は deployment ごとに一意なパラメータ名を生成するため、承認済みパラメータ、ロールバック要求パラメータ、通知済みマーカーは自動削除しません。
+- `ロールバック` は即時反映ではなく、次回の lifecycle hook callback で Lambda が `FAILED` を返したタイミングで反映されます。デフォルト設定では `callBackDelay` を返さないため、ECS の既定間隔 30 秒ごとに再実行されます。
+- 初回デプロイは比較対象の source revision が無いため、Slack 通知で保留せず自動的に次の stage へ進みます。
+- Lambda は deployment ごとに一意なパラメータ名を生成し、`SUCCEEDED` / `FAILED` を返す直前に承認済みパラメータ、ロールバック要求パラメータ、通知済みマーカーを自動削除します。
 - Slack channel configuration 自体は Terraform 管理していないため、Amazon Q の command support と guardrail は別途有効である前提です。
 
 ## 本番導入前に検証すべき観点
@@ -166,6 +172,8 @@ Lambda は `notification-sent` を `Overwrite=false` で作成できた最初の
 - `再ルーティング` ボタンで承認パラメータが正しい名前で作成されること
 - `ロールバック` ボタンでロールバック要求パラメータが正しい名前で作成されること
 - 同一 deployment に `approved` と `rollback` が両方ある場合に `rollback` が優先されること
-- 最大 60 秒で lifecycle hook が `FAILED` を返し、ECS がロールバックへ進むこと
+- 初回デプロイで Slack 通知なしに次の stage へ進むこと
+- `SUCCEEDED` / `FAILED` の返却時に deployment 単位の SSM パラメータが削除されること
+- デフォルト設定では最大 30 秒程度で lifecycle hook が `FAILED` を返し、ECS がロールバックへ進むこと
 - `chatbot_region` がワークロードリージョンと異なる場合でも custom action を正しく作成・関連付けできること
 - 既存 CLI 実装から import した後に不要な recreate が発生しないこと

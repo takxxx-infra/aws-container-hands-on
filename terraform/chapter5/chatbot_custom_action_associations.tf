@@ -1,16 +1,25 @@
 # ##################################################
+# Locals
+# ##################################################
+locals {
+  chat_configuration_arn = "arn:aws:chatbot::${data.aws_caller_identity.current.account_id}:chat-configuration/slack-channel/ecs-bg-deployment"
+  chatbot_region         = "us-west-2"
+}
+
+
+# ##################################################
 # Chatbot Custom Action Associations
 # ##################################################
 resource "terraform_data" "chatbot_custom_action_association_approve" {
   input = {
     action_arn             = awscc_chatbot_custom_action.approve.id
-    chat_configuration_arn = var.chat_configuration_arn
+    chat_configuration_arn = local.chat_configuration_arn
     chatbot_region         = local.chatbot_region
   }
 
   triggers_replace = [
     awscc_chatbot_custom_action.approve.id,
-    var.chat_configuration_arn,
+    "arn:aws:chatbot::${data.aws_caller_identity.current.account_id}:chat-configuration/slack-channel/ecs-bg-deployment",
     local.chatbot_region,
   ]
 
@@ -71,13 +80,13 @@ resource "terraform_data" "chatbot_custom_action_association_approve" {
 resource "terraform_data" "chatbot_custom_action_association_rollback" {
   input = {
     action_arn             = awscc_chatbot_custom_action.rollback.id
-    chat_configuration_arn = var.chat_configuration_arn
+    chat_configuration_arn = "arn:aws:chatbot::${data.aws_caller_identity.current.account_id}:chat-configuration/slack-channel/ecs-bg-deployment"
     chatbot_region         = local.chatbot_region
   }
 
   triggers_replace = [
     awscc_chatbot_custom_action.rollback.id,
-    var.chat_configuration_arn,
+    local.chat_configuration_arn,
     local.chatbot_region,
   ]
 

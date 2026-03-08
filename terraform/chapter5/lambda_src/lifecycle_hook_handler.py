@@ -12,6 +12,8 @@ from botocore.exceptions import ClientError
 LOGGER = logging.getLogger()
 LOGGER.setLevel(logging.INFO)
 
+# ECS の poll 型 lifecycle hook は同じ deployment に対して複数回呼ばれるため、
+# 承認状態は deployment ごとの SSM パラメータで管理する。
 SNS_TOPIC_ARN = os.environ["APPROVAL_SNS_TOPIC_ARN"]
 APPROVAL_PARAMETER_PREFIX = os.environ["APPROVAL_PARAMETER_PREFIX"].rstrip("/")
 CALLBACK_DELAY_SECONDS = int(os.environ["CALLBACK_DELAY_SECONDS"])
@@ -28,6 +30,8 @@ def lambda_handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
     LOGGER.info("Received event: %s", json.dumps(event, default=str))
 
     try:
+        # EventBridge / Lambda direct invoke / JSON 文字列ネストなど、
+        # ECS から渡される event 形式の揺れをここで吸収する。
         payload = _event_payload(event)
         hook_details = _coerce_mapping(_find_first(event, "hookDetails") or {})
 
@@ -91,7 +95,13 @@ def lambda_handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
             deployment_id,
             "notification-sent",
         )
+        parameter_names = (
+            approval_parameter_name,
+            rollback_parameter_name,
+            notification_marker_name,
+        )
 
+        # ロールバック要求は承認より優先して扱う。
         if _parameter_exists(rollback_parameter_name):
             LOGGER.info(
                 "Rollback parameter already exists. service=%s deployment=%s parameter=%s",
@@ -99,6 +109,7 @@ def lambda_handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
                 deployment_id,
                 rollback_parameter_name,
             )
+            _cleanup_deployment_parameters(*parameter_names)
             return _response("FAILED")
 
         if _parameter_exists(approval_parameter_name):
@@ -108,6 +119,19 @@ def lambda_handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
                 deployment_id,
                 approval_parameter_name,
             )
+            _cleanup_deployment_parameters(*parameter_names)
+            return _response("SUCCEEDED")
+
+        # 初回デプロイ時は比較対象の source revision が存在しないため、
+        # 再ルーティング待ちにせずそのまま次の stage へ進める。
+        deployment_detail = _describe_service_deployment(service_deployment_arn)
+        if _is_initial_deployment(deployment_detail):
+            LOGGER.info(
+                "Initial deployment detected. service=%s deployment=%s",
+                service_name,
+                deployment_id,
+            )
+            _cleanup_deployment_parameters(*parameter_names)
             return _response("SUCCEEDED")
 
         should_notify = _create_notification_marker(notification_marker_name)
@@ -142,6 +166,8 @@ def lambda_handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
 
 
 def _event_payload(event: dict[str, Any]) -> dict[str, Any]:
+    # ECS lifecycle hook event は detail / payload / body などに
+    # 実データが入る場合があるため、先頭の dict payload を抽出する。
     if not isinstance(event, dict):
         return {}
 
@@ -284,6 +310,8 @@ def _resolve_service_deployment(
     service_arn: str,
     target_revision_arn: str | None,
 ) -> dict[str, Any] | None:
+    # list_service_deployments は詳細情報が少ないため、
+    # まず対象 deployment ARN を引く用途に限定して使う。
     deployments: list[dict[str, Any]] = []
     next_token: str | None = None
 
@@ -312,6 +340,22 @@ def _resolve_service_deployment(
 
     epoch = datetime(1970, 1, 1, tzinfo=timezone.utc)
     return max(deployments, key=lambda item: item.get("createdAt") or epoch)
+
+
+def _describe_service_deployment(service_deployment_arn: str) -> dict[str, Any]:
+    response = ECS.describe_service_deployments(serviceDeploymentArns=[service_deployment_arn])
+    failures = response.get("failures", [])
+    if failures:
+        reason = failures[0].get("reason", "Unknown failure")
+        raise RuntimeError(
+            f"Could not describe service deployment {service_deployment_arn}: {reason}"
+        )
+
+    deployments = response.get("serviceDeployments", [])
+    if not deployments:
+        raise RuntimeError(f"Service deployment not found: {service_deployment_arn}")
+
+    return deployments[0]
 
 
 def _parameter_name(cluster_name: str, service_name: str, deployment_id: str, suffix: str) -> str:
@@ -346,6 +390,26 @@ def _delete_parameter(name: str) -> None:
             LOGGER.warning("Failed to delete parameter %s: %s", name, error)
 
 
+def _cleanup_deployment_parameters(*names: str) -> None:
+    # hook が終端状態になった時点で deployment 単位の状態を消し、
+    # 古い承認・ロールバック要求が次回デプロイへ残らないようにする。
+    for name in dict.fromkeys(names):
+        _delete_parameter(name)
+
+
+def _is_initial_deployment(deployment: dict[str, Any]) -> bool:
+    source_service_revisions = deployment.get("sourceServiceRevisions")
+    if isinstance(source_service_revisions, list):
+        return len(source_service_revisions) == 0
+
+    # ドキュメントや SDK の表記差分に備えて単数形も許容する。
+    legacy_source_revision = deployment.get("sourceServiceRevision")
+    if isinstance(legacy_source_revision, dict):
+        return len(legacy_source_revision) == 0
+
+    return legacy_source_revision is None
+
+
 def _publish_notification(
     *,
     cluster_arn: str,
@@ -358,6 +422,8 @@ def _publish_notification(
     rollback_parameter_name: str,
     action_group: str,
 ) -> None:
+    # Slack の custom action から承認/ロールバック対象を引けるように、
+    # deployment ごとの SSM パラメータ名を additionalContext に載せる。
     region, account_id = _region_and_account_from_arn(service_arn)
 
     message = {
@@ -365,7 +431,7 @@ def _publish_notification(
         "source": "custom",
         "content": {
             "textType": "client-markdown",
-            "title": "ECS Blue/Green デプロイ承認待ち",
+            "title": "ECS Blue/Green 再ルーティング承認待ち",
             "description": (
                 f"AccountId: `{account_id}`\n"
                 f"Region: `{region}`\n"
@@ -374,8 +440,8 @@ def _publish_notification(
                 f"DeploymentId: `{deployment_id}`"
             ),
             "nextSteps": [
-                "問題がなければ `再ルーティング` を押して承認パラメータを作成してください。",
-                "切り戻す場合は `ロールバック` を押してロールバック要求パラメータを作成してください。",
+                "問題がなければ `再ルーティング` を選択してください。",
+                "切り戻す場合は `ロールバック` を選択してください。",
             ],
             "keywords": [
                 "ecs",
@@ -408,6 +474,7 @@ def _publish_notification(
 
 def _response(hook_status: str, callback_delay: int | None = None) -> dict[str, Any]:
     response: dict[str, Any] = {"hookStatus": hook_status}
-    if callback_delay is not None:
+    # 0 以下は「独自 delay を返さず、ECS の既定間隔に任せる」扱いにする。
+    if callback_delay is not None and callback_delay > 0:
         response["callBackDelay"] = callback_delay
     return response

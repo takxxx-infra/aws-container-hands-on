@@ -1,15 +1,24 @@
+# ##################################################
+# Locals
+# ##################################################
 locals {
+  approval_action_value = "approved"
+  rollback_action_value = "rollback"
   chatbot_custom_action_command = {
-    approve  = "ssm put-parameter --name $P --value ${local.approval_action_value} --type String --region ${local.region}"
-    rollback = "ssm put-parameter --name $R --value ${local.rollback_action_value} --type String --region ${local.region}"
+    approve  = "ssm put-parameter --name $ParameterName --value ${local.approval_action_value} --type String --region ${local.region}"
+    rollback = "ssm put-parameter --name $RollbackParameterName --value ${local.rollback_action_value} --type String --region ${local.region}"
   }
+
+  approval_action_group = "ecs-bg-approval"
+  approve_action_name   = "${local.project_name}-ecs-bg-reroute"
+  rollback_action_name  = "${local.project_name}-ecs-bg-rollback"
 }
 
 # ##################################################
 # Chatbot Custom Action Definitions
 # ##################################################
 resource "awscc_chatbot_custom_action" "approve" {
-  provider    = awscc.chatbot
+  provider    = awscc.awscc
   action_name = local.approve_action_name
   alias_name  = local.approve_action_name
 
@@ -24,20 +33,20 @@ resource "awscc_chatbot_custom_action" "approve" {
       criteria = [
         {
           operator      = "EQUALS"
-          variable_name = "A"
+          variable_name = "ActionGroup"
           value         = local.approval_action_group
         }
       ]
       variables = {
-        A = "event.metadata.additionalContext.ActionGroup"
-        P = "event.metadata.additionalContext.ParameterName"
+        ActionGroup   = "event.metadata.additionalContext.ActionGroup"
+        ParameterName = "event.metadata.additionalContext.ParameterName"
       }
     }
   ]
 }
 
 resource "awscc_chatbot_custom_action" "rollback" {
-  provider    = awscc.chatbot
+  provider    = awscc.awscc
   action_name = local.rollback_action_name
   alias_name  = local.rollback_action_name
 
@@ -52,13 +61,13 @@ resource "awscc_chatbot_custom_action" "rollback" {
       criteria = [
         {
           operator      = "EQUALS"
-          variable_name = "A"
+          variable_name = "ActionGroup"
           value         = local.approval_action_group
         }
       ]
       variables = {
-        A = "event.metadata.additionalContext.ActionGroup"
-        R = "event.metadata.additionalContext.RollbackParameterName"
+        ActionGroup           = "event.metadata.additionalContext.ActionGroup"
+        RollbackParameterName = "event.metadata.additionalContext.RollbackParameterName"
       }
     }
   ]

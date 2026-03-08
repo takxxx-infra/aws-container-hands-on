@@ -100,19 +100,20 @@ resource "aws_iam_role_policy" "ecs_bg_approval_lambda" {
           "ssm:PutParameter",
           "ssm:DeleteParameter"
         ]
-        Resource = local.approval_parameter_arn_pattern
+        Resource = "arn:${data.aws_partition.current.partition}:ssm:${local.region}:${data.aws_caller_identity.current.account_id}:parameter/ecs-bg-approval/*"
       },
       {
         Effect = "Allow"
         Action = [
           "sns:Publish"
         ]
-        Resource = var.approval_sns_topic_arn
+        Resource = "${aws_sns_topic.ecs_bg_deployment.arn}"
       },
       {
         Effect = "Allow"
         Action = [
-          "ecs:ListServiceDeployments"
+          "ecs:ListServiceDeployments",
+          "ecs:DescribeServiceDeployments"
         ]
         Resource = "*"
       }
@@ -120,9 +121,8 @@ resource "aws_iam_role_policy" "ecs_bg_approval_lambda" {
   })
 }
 
-resource "aws_iam_role_policy" "ecs_lifecycle_hook" {
+resource "aws_iam_policy" "ecs_lifecycle_hook" {
   name = "${local.project_name}-ecs-lifecycle-hook"
-  role = aws_iam_role.ecs_lifecycle_hook.id
   policy = jsonencode({
     Version = "2012-10-17"
     Statement = [{
@@ -145,7 +145,7 @@ resource "aws_iam_policy" "chatbot_custom_actions" {
         Action = [
           "ssm:PutParameter"
         ]
-        Resource = local.approval_parameter_arn_pattern
+        Resource = "arn:${data.aws_partition.current.partition}:ssm:${local.region}:${data.aws_caller_identity.current.account_id}:parameter/ecs-bg-approval/*"
       }
     ]
   })

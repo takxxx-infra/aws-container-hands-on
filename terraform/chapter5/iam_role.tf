@@ -73,6 +73,9 @@ resource "aws_iam_role" "ecs_bg_approval_lambda" {
   })
 }
 
+# ##################################################
+# ECS Lifecycle Hook Role
+# ##################################################
 resource "aws_iam_role" "ecs_lifecycle_hook" {
   name = "${local.project_name}-ecs-lifecycle-hook"
   assume_role_policy = jsonencode({
@@ -85,6 +88,14 @@ resource "aws_iam_role" "ecs_lifecycle_hook" {
       }
     }]
   })
+}
+
+resource "aws_iam_role_policy_attachment" "ecs_lifecycle_hook" {
+  for_each = {
+    lambda = aws_iam_policy.ecs_lifecycle_hook.arn
+  }
+  role       = aws_iam_role.ecs_lifecycle_hook.name
+  policy_arn = each.value
 }
 
 # ##################################################
@@ -160,5 +171,16 @@ resource "aws_iam_role_policy_attachment" "rds_monitoring" {
     rds_monitoring = "arn:aws:iam::aws:policy/service-role/AmazonRDSEnhancedMonitoringRole"
   }
   role       = aws_iam_role.rds_monitoring.name
+  policy_arn = each.value
+}
+
+# ##################################################
+# Amazon Q Developer chat ChanelRole
+# ##################################################
+resource "aws_iam_role_policy_attachment" "q_developer_chat_chanel" {
+  for_each = {
+    parameter_store = aws_iam_policy.chatbot_custom_actions.arn
+  }
+  role       = "ecs-bg-deployment-q-role"
   policy_arn = each.value
 }
